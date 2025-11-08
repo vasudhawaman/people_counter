@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>People Counter</title>
+  <title>Live People Counter</title>
   <style>
     body {
       font-family: sans-serif;
@@ -21,18 +21,19 @@
   </style>
 </head>
 <body>
-  <h1>People Count</h1>
+  <h1>Live People Count</h1>
   <div id="count"><%= count %></div>
 
-  <button onclick="updateCount('add')">➕ Add</button>
-  <button onclick="updateCount('sub')">➖ Subtract</button>
+  <button onclick="fetch('/add')">➕ Add</button>
+  <button onclick="fetch('/sub')">➖ Subtract</button>
 
   <script>
-    async function updateCount(action) {
-      const res = await fetch(`/${action}`);
-      const data = await res.json();
+    const eventSource = new EventSource('/events');
+
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
       document.getElementById('count').textContent = data.count;
-    }
+    };
   </script>
 </body>
 </html>
