@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>People Counter</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin-top: 100px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    #count {
+      font-size: 40px;
+      margin: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>People Count</h1>
+  <div id="count"><%= count %></div>
+
+  <button onclick="updateCount('add')">➕ Add</button>
+  <button onclick="updateCount('sub')">➖ Subtract</button>
+
+  <script>
+    async function updateCount(action) {
+      const res = await fetch(`/${action}`);
+      const data = await res.json();
+      document.getElementById('count').textContent = data.count;
+    }
+  </script>
+</body>
+</html>
