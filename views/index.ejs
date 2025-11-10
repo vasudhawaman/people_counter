@@ -1,39 +1,239 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Live People Counter</title>
+  <meta charset="utf-8" />
+  <title>Live 1x2 Grid</title>
   <style>
+    :root{
+      --cell-size: 220px;
+      --gap: 20px;
+      --radius: 12px;
+    }
+
     body {
-      font-family: sans-serif;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #f5f6f8;
+    }
+
+    .container {
       text-align: center;
-      margin-top: 100px;
+      width: calc((var(--cell-size) * 2) + var(--gap) + 40px);
+      max-width: 96vw;
     }
-    button {
-      padding: 10px 20px;
-      margin: 10px;
-      font-size: 18px;
+
+    h1 { margin-bottom: 18px; font-size: 20px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr); /* 1 x 2 */
+      gap: var(--gap);
+      justify-items: center;
+    }
+
+    .cell {
+      width: var(--cell-size);
+      height: var(--cell-size);
+      border-radius: var(--radius);
+      box-shadow: 0 6px 18px rgba(10,10,20,0.06);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: background 220ms ease, transform 120ms ease;
       cursor: pointer;
+      user-select: none;
     }
-    #count {
-      font-size: 40px;
-      margin: 20px;
+
+    .cell:hover { transform: translateY(-4px); }
+
+    .cell.free {
+      background: linear-gradient(180deg, #e9fff0, #dfffe6);
+      border: 2px solid #b7f0c8;
+      color: #064e2e;
+    }
+
+    .cell.occupied {
+      background: linear-gradient(180deg, #ffecec, #ffdede);
+      border: 2px solid #ffb4b4;
+      color: #5a0707;
+    }
+
+    .cell .id {
+      font-weight: 700;
+      font-size: 18px;
+      margin-bottom: 10px;
+      opacity: 0.9;
+    }
+
+    .cell .value {
+      font-size: 44px;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+
+    .cell .meta {
+      margin-top: 10px;
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    .controls {
+      margin-top: 18px;
+    }
+
+    .controls button {
+      padding: 8px 14px;
+      margin: 0 6px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .controls .btn-toggle { background:#0066ff; color: #fff; }
+    .controls .btn-refresh { background:#efefef; color:#111; }
+
+    @media (max-width: 520px) {
+      .grid { grid-template-columns: 1fr; }
+      .container { width: 92vw; }
     }
   </style>
 </head>
 <body>
-  <h1>Live People Count</h1>
-  <div id="count"><%= count %></div>
+  <div class="container">
+    <h1>Live 1 × 2 Grid</h1>
+    <h2>Total Count: <span id="total"><%= total %></span></h2>
 
-  <button onclick="fetch('/add')">➕ Add</button>
-  <button onclick="fetch('/sub')">➖ Subtract</button>
 
+    <div id="grid" class="grid">
+      <% cells.forEach(function(cell) { %>
+        <div class="cell <%= cell.occupied ? 'occupied' : 'free' %>" data-id="<%= cell.id %>">
+          <div class="id">Slot <%= cell.id %></div>
+          <div class="value" data-value><%= cell.value %></div>
+          <div class="meta"><%= cell.occupied ? 'Occupied' : 'Free' %></div>
+        </div>
+      <% }) %>
+    </div>
+
+   
   <script>
-    const eventSource = new EventSource('/events');
+    // SSE: listening to server-sent events on /events
+    const evt = new EventSource('/events');
 
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      document.getElementById('count').textContent = data.count;
+    // Helper: update a single cell DOM from an object {id, value, occupied}
+    function updateCellDOM(cellObj) {
+      const el = document.querySelector('.cell[data-id="' + cellObj.id + '"]');
+      if (!el) return;
+
+      // update classes
+      el.classList.toggle('occupied', !!cellObj.occupied);
+      el.classList.toggle('free', !cellObj.occupied);
+
+      // update value text
+      const valueEl = el.querySelector('[data-value]');
+      if (valueEl && typeof cellObj.value !== 'undefined') {
+        valueEl.textContent = cellObj.value;
+      }
+
+      // update meta text
+      const metaEl = el.querySelector('.meta');
+      if (metaEl) metaEl.textContent = cellObj.occupied ? 'Occupied' : 'Free';
+    }
+
+    // SSE message handler:
+    // Accepts either:
+    // 1) { cells: [{id, value, occupied}, ...] }  -> full update
+    // 2) { id: 'A', value: 5, occupied: true }   -> single cell update
+    evt.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+
+        if (Array.isArray(data.cells)) {
+          // full refresh
+          data.cells.forEach(c => updateCellDOM(c));
+        } else if (data.id) {
+          // single cell update
+          updateCellDOM(data);
+        } else {
+          console.warn('Unknown SSE payload', data);
+        }
+      } catch (err) {
+        console.error('Invalid SSE JSON', err, e.data);
+      }
     };
+
+    evt.onerror = (err) => {
+      console.error('SSE error', err);
+      // Optionally try to reconnect logic could go here (EventSource auto-reconnects)
+    };
+
+    // Add click handlers: clicking a cell toggles it (client requests server to toggle)
+    document.getElementById('grid').addEventListener('click', (ev) => {
+      const cell = ev.target.closest('.cell');
+      if (!cell) return;
+      const id = cell.getAttribute('data-id');
+
+      // call server toggle endpoint - implement in your server: /toggle/:id
+      fetch('/toggle/' + encodeURIComponent(id), { method: 'POST' })
+        .then(res => {
+          if (!res.ok) console.warn('toggle failed', res.status);
+        })
+        .catch(err => console.error('toggle request error', err));
+    });
+
+    // Refresh button: request a snapshot from server
+    document.getElementById('refreshBtn').addEventListener('click', () => {
+      fetch('/snapshot') // implement server route to return current cells JSON
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data.cells)) {
+            data.cells.forEach(c => updateCellDOM(c));
+          }
+        })
+        .catch(err => console.error('snapshot error', err));
+    });
+    evt.onmessage = (e) => {
+  try {
+    const data = JSON.parse(e.data);
+
+    // update total
+    if (typeof data.total !== 'undefined') {
+      document.getElementById('total').textContent = data.total;
+    }
+
+    // update cells
+    if (Array.isArray(data.cells)) {
+      data.cells.forEach(c => updateCellDOM(c));
+    } else if (data.id) {
+      updateCellDOM(data);
+    }
+  } catch (err) {
+    console.error('Invalid SSE JSON', err, e.data);
+  }
+};
+
+    // Toggle all button: server route /toggle-all (example)
+    document.getElementById('toggleAllBtn').addEventListener('click', () => {
+      fetch('/toggle-all', { method: 'POST' })
+        .then(res => {
+          if (!res.ok) console.warn('toggle-all failed', res.status);
+        })
+        .catch(err => console.error('toggle-all error', err));
+    });
+
+    // OPTIONAL: Visual pulse to show connection
+    (function addConnectionPulse() {
+      const gridEl = document.getElementById('grid');
+      setInterval(() => {
+        gridEl.style.opacity = 0.98;
+        setTimeout(() => gridEl.style.opacity = 1, 150);
+      }, 4000);
+    })();
   </script>
 </body>
 </html>
