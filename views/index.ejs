@@ -150,22 +150,29 @@
     // 1) { cells: [{id, value, occupied}, ...] }  -> full update
     // 2) { id: 'A', value: 5, occupied: true }   -> single cell update
     evt.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
+  try {
+    const data = JSON.parse(e.data);
 
-        if (Array.isArray(data.cells)) {
-          // full refresh
-          data.cells.forEach(c => updateCellDOM(c));
-        } else if (data.id) {
-          // single cell update
-          updateCellDOM(data);
-        } else {
-          console.warn('Unknown SSE payload', data);
-        }
-      } catch (err) {
-        console.error('Invalid SSE JSON', err, e.data);
-      }
-    };
+    // ✅ Update total count if included
+    if (typeof data.total !== 'undefined') {
+      document.getElementById('total').textContent = data.total;
+    }
+
+    // ✅ Handle multiple cells
+    if (Array.isArray(data.cells)) {
+      data.cells.forEach(c => updateCellDOM(c));
+    }
+
+    // ✅ Handle single cell update
+    else if (data.id) {
+      updateCellDOM(data);
+    }
+
+  } catch (err) {
+    console.error('Invalid SSE JSON', err, e.data);
+  }
+};
+
 
     evt.onerror = (err) => {
       console.error('SSE error', err);
@@ -197,25 +204,7 @@
         })
         .catch(err => console.error('snapshot error', err));
     });
-    evt.onmessage = (e) => {
-  try {
-    const data = JSON.parse(e.data);
-
-    // update total
-    if (typeof data.total !== 'undefined') {
-      document.getElementById('total').textContent = data.total;
-    }
-
-    // update cells
-    if (Array.isArray(data.cells)) {
-      data.cells.forEach(c => updateCellDOM(c));
-    } else if (data.id) {
-      updateCellDOM(data);
-    }
-  } catch (err) {
-    console.error('Invalid SSE JSON', err, e.data);
-  }
-};
+    
 
     // Toggle all button: server route /toggle-all (example)
     document.getElementById('toggleAllBtn').addEventListener('click', () => {
