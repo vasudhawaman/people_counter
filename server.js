@@ -14,7 +14,7 @@ let chairs = [
   { id: 1, count: 0, occupied: false },
   { id: 2, count: 0, occupied: false }
 ];
-
+let total =0;
 let clients = []; // SSE connections
 
 // Helper to get total count
@@ -35,7 +35,7 @@ app.get("/events", (req, res) => {
   res.flushHeaders();
 
   // Send initial state immediately
-  res.write(`data: ${JSON.stringify({ total: getTotal(), cells: chairs })}\n\n`);
+  res.write(`data: ${JSON.stringify({ total: total, cells: chairs })}\n\n`);
 
   clients.push(res);
   req.on("close", () => {
@@ -45,7 +45,7 @@ app.get("/events", (req, res) => {
 
 // Broadcast helper
 function broadcastUpdate() {
-  const payload = JSON.stringify({ total: getTotal(), cells: chairs });
+  const payload = JSON.stringify({ total: total, cells: chairs });
   for (const client of clients) {
     client.write(`data: ${payload}\n\n`);
   }
@@ -58,8 +58,9 @@ app.get("/add/:id", (req, res) => {
   if (chair) {
     chair.count++;
     chair.occupied = true;
+    total++;
     broadcastUpdate();
-    res.json({ success: true, message: `Chair ${id} +1`, chair, total: getTotal() });
+    res.json({ success: true, message: `Chair ${id} +1`, chair, total: total });
   } else {
     res.status(404).json({ error: "Chair not found" });
   }
@@ -72,9 +73,11 @@ app.get("/sub/:id", (req, res) => {
   if (chair) {
     chair.count--;
     chair.count = Math.max(0, chair.count);
+    total--;
+    total = Math.max(0,total);
     chair.occupied = chair.count > 0;
     broadcastUpdate();
-    res.json({ success: true, message: `Chair ${id} -1`, chair, total: getTotal() });
+    res.json({ success: true, message: `Chair ${id} -1`, chair, total: total });
   } else {
     res.status(404).json({ error: "Chair not found" });
   }
